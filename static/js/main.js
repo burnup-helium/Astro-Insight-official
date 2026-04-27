@@ -1,118 +1,155 @@
-// 天体分析系统 - 前端JavaScript
+// 天体分析系统 - 分析工作台前端逻辑
 
-// 全局变量
-let currentSection = 'analysis';
+let currentSection = 'overview';
 let charts = {};
+let currentTheme = 'light';
+let currentChartPref = 'structure';
+let currentDataView = 'overview';
 
-// API基础URL
 const API_BASE = window.location.origin;
 
-// 页面加载完成后初始化
+const sectionTitles = {
+    overview: '首页总览',
+    data: '数据概览',
+    analysis: 'EDA分析',
+    structure: '结构空间',
+    compare: '方法对比',
+    results: '结果解释'
+};
+
 document.addEventListener('DOMContentLoaded', function() {
-    showSection('analysis');
+    bindUIEvents();
+    applyTheme(currentTheme);
+    showSection('overview');
     loadSystemStatus();
+    loadDataSummary();
 });
 
-// 显示通知
+function bindUIEvents() {
+    document.querySelectorAll('[data-nav]').forEach(btn => {
+        btn.addEventListener('click', () => showSection(btn.dataset.nav));
+    });
+
+    document.getElementById('startAnalysisBtn')?.addEventListener('click', startAnalysis);
+    document.getElementById('loadOverviewBtn')?.addEventListener('click', loadDataSummary);
+    document.getElementById('loadObjectsBtn')?.addEventListener('click', loadCelestialObjects);
+    document.getElementById('loadClassificationsBtn')?.addEventListener('click', loadClassifications);
+    document.getElementById('loadHistoryBtn')?.addEventListener('click', loadExecutionHistory);
+    document.getElementById('refreshStatusBtn')?.addEventListener('click', checkSystemStatus);
+    document.getElementById('themeToggle')?.addEventListener('click', () => {
+        applyTheme(currentTheme === 'light' ? 'dark' : 'light');
+    });
+
+    document.querySelectorAll('[data-theme]').forEach(btn => {
+        btn.addEventListener('click', () => applyTheme(btn.dataset.theme));
+    });
+
+    document.querySelectorAll('[data-chart-pref]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentChartPref = btn.dataset.chartPref;
+            updateChartPreferenceUI();
+            updateRecommendation();
+        });
+    });
+}
+
+function applyTheme(theme) {
+    currentTheme = theme;
+    document.getElementById('appRoot')?.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.style.transition = 'background 220ms ease, color 220ms ease';
+    updateThemeUI();
+    updateChartColors();
+}
+
+function updateThemeUI() {
+    document.querySelectorAll('[data-theme]').forEach(btn => {
+        const active = btn.dataset.theme === currentTheme;
+        btn.classList.toggle('primary-button', active);
+        btn.classList.toggle('secondary-button', !active);
+    });
+}
+
+function updateChartPreferenceUI() {
+    document.querySelectorAll('[data-chart-pref]').forEach(btn => {
+        const active = btn.dataset.chartPref === currentChartPref;
+        btn.classList.toggle('primary-button', active);
+        btn.classList.toggle('secondary-button', !active);
+    });
+}
+
 function showNotification(title, message, type = 'info') {
     const notification = document.getElementById('notification');
     const icon = document.getElementById('notificationIcon');
     const titleEl = document.getElementById('notificationTitle');
     const messageEl = document.getElementById('notificationMessage');
-    
-    // 设置图标和颜色
+
     const config = {
-        'info': { icon: 'fas fa-info-circle', color: 'blue' },
-        'success': { icon: 'fas fa-check-circle', color: 'green' },
-        'warning': { icon: 'fas fa-exclamation-triangle', color: 'yellow' },
-        'error': { icon: 'fas fa-times-circle', color: 'red' }
+        info: { icon: 'fas fa-info-circle', color: '#335cff' },
+        success: { icon: 'fas fa-check-circle', color: '#0f766e' },
+        warning: { icon: 'fas fa-exclamation-triangle', color: '#b45309' },
+        error: { icon: 'fas fa-times-circle', color: '#dc2626' }
     };
-    
-    const typeConfig = config[type] || config['info'];
-    icon.className = typeConfig.icon + ` text-${typeConfig.color}-500`;
-    notification.className = notification.className.replace(/border-\w+-500/, `border-${typeConfig.color}-500`);
-    
+
+    const typeConfig = config[type] || config.info;
+    icon.className = `${typeConfig.icon}`;
+    icon.style.color = typeConfig.color;
     titleEl.textContent = title;
     messageEl.textContent = message;
-    
-    // 显示通知
+
     notification.classList.remove('translate-x-full');
     notification.classList.add('translate-x-0');
-    
-    // 3秒后自动隐藏
+
     setTimeout(() => {
         notification.classList.remove('translate-x-0');
         notification.classList.add('translate-x-full');
-    }, 3000);
+    }, 2800);
 }
 
-// 显示/隐藏加载状态
-function toggleLoading(elementId, show) {
-    const element = document.getElementById(elementId);
-    if (show) {
-        element.classList.add('active');
-    } else {
-        element.classList.remove('active');
-    }
-}
-
-// 显示/隐藏结果容器
-function toggleResult(elementId, show) {
-    const element = document.getElementById(elementId);
-    if (show) {
-        element.classList.add('active');
-    } else {
-        element.classList.remove('active');
-    }
-}
-
-// 切换界面
 function showSection(sectionName) {
-    // 隐藏所有界面
-    document.querySelectorAll('.section').forEach(section => {
+    currentSection = sectionName;
+    document.querySelectorAll('.section-view').forEach(section => {
         section.classList.add('hidden');
     });
-    
-    // 显示指定界面
-    const targetSection = document.getElementById(`${sectionName}-section`);
-    if (targetSection) {
-        targetSection.classList.remove('hidden');
-        currentSection = sectionName;
-        
-        // 根据界面类型加载相应数据
-        if (sectionName === 'statistics') {
-            loadStatistics();
-        } else if (sectionName === 'data') {
-            loadDataSummary();
-        }
-    }
+
+    const targetSection = document.querySelector(`[data-section="${sectionName}"]`);
+    if (targetSection) targetSection.classList.remove('hidden');
+
+    document.querySelectorAll('[data-nav]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.nav === sectionName);
+    });
+
+    if (sectionName === 'data') loadDataSummary();
+    if (sectionName === 'analysis') loadStatistics();
+    if (sectionName === 'structure') loadStatistics();
+    if (sectionName === 'compare') updateRecommendation();
+    if (sectionName === 'results') updateInsightPanel();
 }
 
-// 开始分析
 async function startAnalysis() {
     const query = document.getElementById('analysisQuery').value.trim();
     const userType = document.getElementById('userType').value;
     const analysisType = document.getElementById('analysisType').value;
-    
+
     if (!query) {
-        showNotification('错误', '请输入分析查询内容', 'error');
+        showNotification('错误', '请输入分析任务描述', 'error');
         return;
     }
-    
-    // 显示加载状态
-    toggleLoading('analysisLoading', true);
-    toggleResult('analysisResult', false);
-    
+
+    toggleLoading(true);
     try {
         const response = await axios.post(`${API_BASE}/api/analyze`, {
-            query: query,
+            query,
             user_type: userType,
             analysis_type: analysisType
         });
-        
+
         if (response.data.success) {
             displayAnalysisResult(response.data.result);
-            showNotification('成功', '分析完成', 'success');
+            updateRecommendation(response.data.result);
+            updateInsightPanel(response.data.result);
+            showNotification('成功', '分析完成，已更新结果解释', 'success');
+            showSection('results');
         } else {
             throw new Error(response.data.message || '分析失败');
         }
@@ -120,129 +157,159 @@ async function startAnalysis() {
         console.error('分析错误:', error);
         showNotification('错误', error.response?.data?.message || error.message || '分析失败', 'error');
     } finally {
-        toggleLoading('analysisLoading', false);
+        toggleLoading(false);
     }
 }
 
-// 显示分析结果
+function toggleLoading(show) {
+    const btn = document.getElementById('startAnalysisBtn');
+    if (!btn) return;
+    btn.disabled = show;
+    btn.innerHTML = show
+        ? '<i class="fas fa-spinner fa-spin mr-2"></i>分析中...'
+        : '<i class="fas fa-play mr-2"></i>开始分析';
+}
+
 function displayAnalysisResult(result) {
-    // 天体信息
-    const celestialInfo = document.getElementById('celestialInfo');
-    if (result.celestial_info) {
-        const info = result.celestial_info;
-        celestialInfo.innerHTML = `
-            <div class="space-y-2">
-                <div><strong>名称:</strong> ${info.name || '未知'}</div>
-                <div><strong>类型:</strong> ${info.type || '未知'}</div>
-                <div><strong>坐标:</strong> ${info.coordinates || '未知'}</div>
-                <div><strong>描述:</strong> ${info.description || '无'}</div>
+    const analysisResult = document.getElementById('analysisResult');
+    if (!analysisResult) return;
+
+    const confidence = typeof result.confidence === 'number' ? `${(result.confidence * 100).toFixed(1)}%` : 'N/A';
+    const info = result.celestial_info || {};
+    const code = result.generated_code || '# 暂无生成代码';
+
+    analysisResult.innerHTML = `
+        <div class="grid grid-cols-1 gap-4">
+            <div class="rounded-3xl p-4" style="background: var(--accent-soft);">
+                <div class="text-xs uppercase tracking-wider" style="color: var(--muted);">天体信息</div>
+                <div class="mt-2 space-y-1">
+                    <div><span class="font-medium">名称：</span>${info.name || '未知'}</div>
+                    <div><span class="font-medium">类型：</span>${info.type || '未知'}</div>
+                    <div><span class="font-medium">坐标：</span>${info.coordinates || '未知'}</div>
+                    <div><span class="font-medium">描述：</span>${info.description || '无'}</div>
+                </div>
             </div>
-        `;
-    } else {
-        celestialInfo.innerHTML = '<p class="text-gray-500">暂无天体信息</p>';
-    }
-    
-    // 分类结果
-    const classificationResult = document.getElementById('classificationResult');
-    if (result.classification) {
-        const confidence = result.confidence ? (result.confidence * 100).toFixed(1) : 'N/A';
-        classificationResult.innerHTML = `
-            <div class="space-y-2">
-                <div><strong>分类:</strong> ${result.classification}</div>
-                <div><strong>置信度:</strong> ${confidence}%</div>
-                <div><strong>分析类型:</strong> ${result.analysis_type}</div>
-                <div><strong>处理时间:</strong> ${result.processing_time || 'N/A'}秒</div>
+            <div class="rounded-3xl p-4" style="background: rgba(124,58,237,0.10);">
+                <div class="text-xs uppercase tracking-wider" style="color: var(--muted);">分类结果</div>
+                <div class="mt-2 space-y-1">
+                    <div><span class="font-medium">分类：</span>${result.classification || '暂无'}</div>
+                    <div><span class="font-medium">置信度：</span>${confidence}</div>
+                    <div><span class="font-medium">分析类型：</span>${result.analysis_type || '未知'}</div>
+                    <div><span class="font-medium">处理时间：</span>${result.processing_time ? `${result.processing_time} 秒` : 'N/A'}</div>
+                </div>
             </div>
-        `;
-    } else {
-        classificationResult.innerHTML = '<p class="text-gray-500">暂无分类结果</p>';
-    }
-    
-    // 生成代码
-    const generatedCode = document.getElementById('generatedCode');
-    if (result.generated_code) {
-        generatedCode.textContent = result.generated_code;
-    } else {
-        generatedCode.textContent = '# 暂无生成代码';
-    }
-    
-    // 显示结果容器
-    toggleResult('analysisResult', true);
+            <div class="rounded-3xl p-4 glass-strong">
+                <div class="text-xs uppercase tracking-wider" style="color: var(--muted);">生成代码</div>
+                <pre class="mt-2 text-xs whitespace-pre-wrap overflow-x-auto" style="color: var(--text);">${escapeHTML(code)}</pre>
+            </div>
+        </div>
+    `;
 }
 
-// 检查系统状态
+function updateRecommendation(result = null) {
+    const recommendation = document.getElementById('chartRecommendation');
+    const tag = document.getElementById('recommendedChartTag');
+    if (!recommendation || !tag) return;
+
+    const task = result?.analysis_type || document.getElementById('analysisType')?.value || 'classification';
+    let text = '';
+    let label = '';
+
+    if (task === 'structure') {
+        text = '推荐使用结构图、降维散点图、平行坐标和方法对比图。重点回答：结构是否稳定、是否被投影方法放大或扭曲。';
+        label = '推荐图表：结构图';
+    } else if (task === 'spectroscopy') {
+        text = '推荐使用分布图、相关性热力图和特征贡献图。重点回答：哪些谱线或特征最能区分不同类别。';
+        label = '推荐图表：关系图';
+    } else if (task === 'variability') {
+        text = '推荐使用时序图、分组折线和异常点标记。重点回答：变化趋势是否周期性、是否存在异常波动。';
+        label = '推荐图表：时序图';
+    } else if (task === 'photometry') {
+        text = '推荐使用分布图、箱线图和对比图。重点回答：亮度分布是否存在明显分层或离群值。';
+        label = '推荐图表：分布图';
+    } else {
+        text = '推荐使用分类分布图、散点图矩阵和结构图。重点回答：类别是否分离、边界是否清晰、哪些变量更重要。';
+        label = '推荐图表：结构图';
+    }
+
+    recommendation.textContent = text;
+    tag.textContent = label;
+}
+
+function updateInsightPanel(result = null) {
+    const panel = document.getElementById('insightPanel');
+    if (!panel) return;
+
+    const task = result?.analysis_type || document.getElementById('analysisType')?.value || 'classification';
+    const pref = currentChartPref;
+    let content = [];
+
+    content.push(`<p><span class="font-semibold">当前任务：</span>${task}</p>`);
+    content.push(`<p><span class="font-semibold">偏好图表：</span>${pref}</p>`);
+    content.push('<p>解释重点：图表是否只是在展示结果，还是在帮助我们发现结构和生成问题意识。</p>');
+    content.push('<p>方法意识：PCA、t-SNE、UMAP 等方法不只是算法选择，它们会改变“我们看到的结构”。</p>');
+    content.push('<p>设计判断：每张图都应该对应一个分析问题，不做无意义装饰图。</p>');
+
+    panel.innerHTML = content.join('');
+}
+
 async function checkSystemStatus() {
     try {
         const response = await axios.get(`${API_BASE}/api/status`);
-        
         if (response.data.success) {
             const status = response.data.system_status;
-            const uptime = Math.floor(response.data.uptime / 3600); // 转换为小时
-            
-            showNotification('系统状态', 
-                `数据库: ${status.database} | 分析图: ${status.analysis_graph} | 运行时间: ${uptime}小时`, 
-                'info');
+            const uptime = Math.floor(response.data.uptime / 3600);
+            document.getElementById('backendState').textContent = '在线';
+            document.getElementById('sessionState').textContent = `${uptime} 小时`;
+            document.getElementById('dbStatus').textContent = status.database;
+            document.getElementById('graphStatus').textContent = status.analysis_graph;
+            document.getElementById('systemUptime').textContent = `${uptime} 小时`;
+            showNotification('系统状态', `数据库：${status.database} · 分析图：${status.analysis_graph}`, 'info');
         }
     } catch (error) {
         console.error('获取系统状态失败:', error);
+        document.getElementById('backendState').textContent = '离线';
         showNotification('错误', '无法获取系统状态', 'error');
     }
 }
 
-// 加载系统状态
 async function loadSystemStatus() {
-    try {
-        const response = await axios.get(`${API_BASE}/api/status`);
-        
-        if (response.data.success) {
-            const status = response.data.system_status;
-            const uptime = Math.floor(response.data.uptime / 3600);
-            
-            // 更新性能指标
-            document.getElementById('systemUptime').textContent = `${uptime} 小时`;
-            document.getElementById('dbStatus').textContent = status.database;
-            document.getElementById('graphStatus').textContent = status.analysis_graph;
-        }
-    } catch (error) {
-        console.error('加载系统状态失败:', error);
-    }
+    await checkSystemStatus();
 }
 
-// 加载数据摘要
 async function loadDataSummary() {
     try {
         const response = await axios.get(`${API_BASE}/api/data/statistics`);
-        
         if (response.data.success) {
-            const stats = response.data.statistics;
-            
-            // 更新计数
+            const stats = response.data.statistics || {};
             document.getElementById('objectsCount').textContent = stats.total_objects || 0;
             document.getElementById('classificationsCount').textContent = stats.total_classifications || 0;
             document.getElementById('historyCount').textContent = stats.total_executions || 0;
+            document.getElementById('avgResponseTime').textContent = stats.avg_response_time ? `${stats.avg_response_time.toFixed(2)}s` : 'N/A';
+            updateRecommendation();
         }
     } catch (error) {
         console.error('加载数据摘要失败:', error);
-        // 设置默认值
         document.getElementById('objectsCount').textContent = '0';
         document.getElementById('classificationsCount').textContent = '0';
         document.getElementById('historyCount').textContent = '0';
+        document.getElementById('avgResponseTime').textContent = 'N/A';
     }
 }
 
-// 加载天体对象
 async function loadCelestialObjects() {
     try {
         const response = await axios.get(`${API_BASE}/api/data/objects?limit=50`);
-        
         if (response.data.success) {
-            displayDataTable('天体对象', response.data.data, [
+            currentDataView = 'objects';
+            displayDataTable('天体对象', response.data.data || [], [
                 { key: 'name', label: '名称' },
                 { key: 'object_type', label: '类型' },
                 { key: 'coordinates', label: '坐标' },
                 { key: 'magnitude', label: '星等' },
                 { key: 'created_at', label: '创建时间' }
             ]);
+            showSection('data');
         }
     } catch (error) {
         console.error('加载天体对象失败:', error);
@@ -250,13 +317,12 @@ async function loadCelestialObjects() {
     }
 }
 
-// 加载分类结果
 async function loadClassifications() {
     try {
         const response = await axios.get(`${API_BASE}/api/data/classifications?limit=50`);
-        
         if (response.data.success) {
-            displayDataTable('分类结果', response.data.data, [
+            currentDataView = 'classifications';
+            displayDataTable('分类结果', response.data.data || [], [
                 { key: 'object_name', label: '天体名称' },
                 { key: 'classification', label: '分类' },
                 { key: 'confidence', label: '置信度' },
@@ -264,6 +330,7 @@ async function loadClassifications() {
                 { key: 'user_type', label: '用户类型' },
                 { key: 'created_at', label: '创建时间' }
             ]);
+            showSection('data');
         }
     } catch (error) {
         console.error('加载分类结果失败:', error);
@@ -271,13 +338,12 @@ async function loadClassifications() {
     }
 }
 
-// 加载执行历史
 async function loadExecutionHistory() {
     try {
         const response = await axios.get(`${API_BASE}/api/data/history?limit=50`);
-        
         if (response.data.success) {
-            displayDataTable('执行历史', response.data.data, [
+            currentDataView = 'history';
+            displayDataTable('执行历史', response.data.data || [], [
                 { key: 'request_id', label: '请求ID' },
                 { key: 'code_type', label: '代码类型' },
                 { key: 'execution_status', label: '执行状态' },
@@ -285,6 +351,7 @@ async function loadExecutionHistory() {
                 { key: 'memory_usage', label: '内存使用' },
                 { key: 'created_at', label: '创建时间' }
             ]);
+            showSection('data');
         }
     } catch (error) {
         console.error('加载执行历史失败:', error);
@@ -292,83 +359,62 @@ async function loadExecutionHistory() {
     }
 }
 
-// 显示数据表格
 function displayDataTable(title, data, columns) {
     const tableContainer = document.getElementById('dataTable');
-    
+    if (!tableContainer) return;
+
     if (!data || data.length === 0) {
-        tableContainer.innerHTML = `<p class="text-gray-500 text-center py-8">暂无${title}数据</p>`;
+        tableContainer.innerHTML = `<p class="text-sm" style="color: var(--muted);">暂无${title}数据</p>`;
         return;
     }
-    
+
     let tableHTML = `
-        <div class="mb-4">
-            <h4 class="text-lg font-semibold text-gray-900">${title} (${data.length} 条记录)</h4>
+        <div class="mb-4 flex items-center justify-between flex-wrap gap-2">
+            <h4 class="text-lg font-semibold">${title}</h4>
+            <span class="mini-badge rounded-full px-3 py-1 text-xs" style="color: var(--muted);">${data.length} 条记录</span>
         </div>
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+        <table class="min-w-full divide-y soft-line">
+            <thead>
                 <tr>
     `;
-    
-    // 表头
+
     columns.forEach(column => {
-        tableHTML += `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${column.label}</th>`;
+        tableHTML += `<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--muted);">${column.label}</th>`;
     });
-    
+
     tableHTML += `
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody class="divide-y soft-line">
     `;
-    
-    // 表格数据
+
     data.forEach((row, index) => {
-        tableHTML += `<tr class="${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">`;
-        
+        tableHTML += `<tr class="${index % 2 === 0 ? '' : ''}">`;
         columns.forEach(column => {
-            let value = row[column.key] || '-';
-            
-            // 格式化特殊字段
-            if (column.key === 'confidence' && typeof value === 'number') {
-                value = (value * 100).toFixed(1) + '%';
-            } else if (column.key.includes('_at') && value !== '-') {
-                value = new Date(value).toLocaleString('zh-CN');
-            } else if (column.key === 'execution_time' && typeof value === 'number') {
-                value = value.toFixed(2) + 's';
-            } else if (column.key === 'memory_usage' && typeof value === 'number') {
-                value = (value / 1024 / 1024).toFixed(2) + 'MB';
-            }
-            
-            tableHTML += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${value}</td>`;
+            let value = row[column.key] ?? '-';
+            if (column.key === 'confidence' && typeof value === 'number') value = `${(value * 100).toFixed(1)}%`;
+            else if (column.key.includes('_at') && value !== '-') value = new Date(value).toLocaleString('zh-CN');
+            else if (column.key === 'execution_time' && typeof value === 'number') value = `${value.toFixed(2)}s`;
+            else if (column.key === 'memory_usage' && typeof value === 'number') value = `${(value / 1024 / 1024).toFixed(2)}MB`;
+            tableHTML += `<td class="px-4 py-3 text-sm" style="color: var(--text);">${escapeHTML(String(value))}</td>`;
         });
-        
         tableHTML += '</tr>';
     });
-    
-    tableHTML += `
-            </tbody>
-        </table>
-    `;
-    
+
+    tableHTML += `</tbody></table>`;
     tableContainer.innerHTML = tableHTML;
 }
 
-// 加载统计数据
 async function loadStatistics() {
     try {
         const response = await axios.get(`${API_BASE}/api/data/statistics`);
-        
         if (response.data.success) {
-            const stats = response.data.statistics;
-            
-            // 创建图表
+            const stats = response.data.statistics || {};
             createAnalysisTypeChart(stats.analysis_type_distribution || {});
             createUserTypeChart(stats.user_type_distribution || {});
             createSuccessRateChart(stats.success_rate_trend || []);
-            
-            // 更新性能指标
-            document.getElementById('avgResponseTime').textContent = 
-                stats.avg_response_time ? stats.avg_response_time.toFixed(2) + 's' : 'N/A';
+            document.getElementById('avgResponseTime').textContent = stats.avg_response_time ? `${stats.avg_response_time.toFixed(2)}s` : 'N/A';
+            updateRecommendation();
         }
     } catch (error) {
         console.error('加载统计数据失败:', error);
@@ -376,47 +422,35 @@ async function loadStatistics() {
     }
 }
 
-// 创建分析类型分布图
 function createAnalysisTypeChart(data) {
-    const ctx = document.getElementById('analysisTypeChart').getContext('2d');
-    
-    if (charts.analysisType) {
-        charts.analysisType.destroy();
-    }
-    
+    const canvas = document.getElementById('analysisTypeChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (charts.analysisType) charts.analysisType.destroy();
+
     charts.analysisType = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: Object.keys(data),
             datasets: [{
                 data: Object.values(data),
-                backgroundColor: [
-                    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'
-                ],
-                borderWidth: 2,
-                borderColor: '#ffffff'
+                backgroundColor: ['#335cff', '#7c3aed', '#0f766e', '#f59e0b', '#ef4444'],
+                borderWidth: 0,
+                hoverOffset: 8
             }]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        }
+        options: baseChartOptions({
+            plugins: { legend: { position: 'bottom', labels: { color: getTextColor() } } }
+        })
     });
 }
 
-// 创建用户类型分布图
 function createUserTypeChart(data) {
-    const ctx = document.getElementById('userTypeChart').getContext('2d');
-    
-    if (charts.userType) {
-        charts.userType.destroy();
-    }
-    
+    const canvas = document.getElementById('userTypeChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (charts.userType) charts.userType.destroy();
+
     charts.userType = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -424,69 +458,99 @@ function createUserTypeChart(data) {
             datasets: [{
                 label: '用户数量',
                 data: Object.values(data),
-                backgroundColor: '#10B981',
-                borderColor: '#059669',
-                borderWidth: 1
+                backgroundColor: 'rgba(51,92,255,0.75)',
+                borderRadius: 12,
+                borderSkipped: false
             }]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
+        options: baseChartOptions({
             scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
-        }
+                x: { ticks: { color: getTextColor() }, grid: { color: getGridColor() } },
+                y: { beginAtZero: true, ticks: { color: getTextColor() }, grid: { color: getGridColor() } }
+            },
+            plugins: { legend: { display: false } }
+        })
     });
 }
 
-// 创建成功率趋势图
 function createSuccessRateChart(data) {
-    const ctx = document.getElementById('successRateChart').getContext('2d');
-    
-    if (charts.successRate) {
-        charts.successRate.destroy();
-    }
-    
+    const canvas = document.getElementById('successRateChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (charts.successRate) charts.successRate.destroy();
+
     charts.successRate = new Chart(ctx, {
         type: 'line',
         data: {
             labels: data.map(item => item.date || ''),
             datasets: [{
                 label: '成功率 (%)',
-                data: data.map(item => item.success_rate * 100 || 0),
-                borderColor: '#8B5CF6',
-                backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                borderWidth: 2,
-                fill: true
+                data: data.map(item => (item.success_rate || 0) * 100),
+                borderColor: '#7c3aed',
+                backgroundColor: 'rgba(124,58,237,0.12)',
+                tension: 0.32,
+                fill: true,
+                pointRadius: 3,
+                pointHoverRadius: 5
             }]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
+        options: baseChartOptions({
             scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100
-                }
-            }
-        }
+                x: { ticks: { color: getTextColor() }, grid: { color: getGridColor() } },
+                y: { beginAtZero: true, max: 100, ticks: { color: getTextColor() }, grid: { color: getGridColor() } }
+            },
+            plugins: { legend: { labels: { color: getTextColor() } } }
+        })
     });
 }
 
-// 工具函数：格式化文件大小
+function baseChartOptions(extra = {}) {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 700, easing: 'easeOutQuart' },
+        ...extra
+    };
+}
+
+function updateChartColors() {
+    Object.values(charts).forEach(chart => {
+        if (!chart) return;
+        chart.options = baseChartOptions({
+            scales: chart.options.scales,
+            plugins: chart.options.plugins
+        });
+        chart.update();
+    });
+}
+
+function getTextColor() {
+    return getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#101828';
+}
+
+function getGridColor() {
+    return getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || 'rgba(15,23,42,0.08)';
+}
+
+function escapeHTML(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
-// 工具函数：格式化时间
 function formatDuration(seconds) {
-    if (seconds < 60) return seconds.toFixed(1) + 's';
-    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ' + (seconds % 60).toFixed(0) + 's';
-    return Math.floor(seconds / 3600) + 'h ' + Math.floor((seconds % 3600) / 60) + 'm';
+    if (seconds < 60) return `${seconds.toFixed(1)}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${(seconds % 60).toFixed(0)}s`;
+    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 }

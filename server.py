@@ -22,13 +22,15 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 导入项目模块
 try:
-    from src.graph.builder import create_astro_agent_graph
+    from src.graph import build_graph_with_memory
     from src.database import data_manager, DatabaseAPI
-    from src.code_generation import code_generator
 except ImportError as e:
     print(f"导入模块失败：{e}")
     print("请确保所有依赖模块已正确安装")
     sys.exit(1)
+
+# 代码生成模块目前在仓库中没有可导出的统一入口，先用运行时占位避免启动失败
+code_generator = None
 
 # 配置日志
 logging.basicConfig(
@@ -71,7 +73,7 @@ def initialize_system():
         logger.info("数据库API初始化完成")
         
         # 初始化分析图
-        astro_graph = create_astro_agent_graph()
+        astro_graph = build_graph_with_memory()
         logger.info("天体分析图初始化完成")
         
         # 初始化代码生成器
@@ -116,19 +118,7 @@ def handle_errors(f):
 @app.route('/')
 def index():
     """主页"""
-    return jsonify({
-        "service": "天体分析系统 API",
-        "version": "1.0.0",
-        "status": "运行中",
-        "timestamp": datetime.now().isoformat(),
-        "endpoints": {
-            "分析": "/api/analyze",
-            "代码生成": "/api/generate-code",
-            "代码执行": "/api/execute-code",
-            "数据查询": "/api/data/*",
-            "系统状态": "/api/status"
-        }
-    })
+    return render_template('index.html')
 
 @app.route('/api/status')
 @handle_errors
@@ -229,56 +219,11 @@ def analyze_celestial_object():
 @handle_errors
 def generate_code():
     """代码生成API"""
-    data = request.get_json()
-    
-    if not data:
-        raise BadRequest("请求体不能为空")
-    
-    analysis_type = data.get('analysis_type', 'classification')
-    object_type = data.get('object_type', 'star')
-    target_name = data.get('target_name', '未知天体')
-    
-    logger.info(f"收到代码生成请求：{analysis_type} - {target_name}")
-    
-    try:
-        from src.code_generation import CodeGenerationRequest
-        
-        # 创建代码生成请求
-        request_obj = CodeGenerationRequest(
-            analysis_type=analysis_type,
-            object_type=object_type,
-            target_name=target_name,
-            coordinates=data.get('coordinates'),
-            custom_requirements=data.get('custom_requirements'),
-            use_template=data.get('use_template', True),
-            use_llm=data.get('use_llm', False),
-            optimization_level=data.get('optimization_level', 'standard')
-        )
-        
-        # 生成代码
-        result = code_generator.generate_code(request_obj)
-        
-        return jsonify({
-            "success": result.success,
-            "result": {
-                "request_id": result.request_id,
-                "generated_code": result.generated_code,
-                "template_used": result.template_used,
-                "validation_result": result.validation_result,
-                "optimization_applied": result.optimization_applied,
-                "estimated_runtime": result.estimated_runtime,
-                "dependencies": result.dependencies,
-                "metadata": result.metadata
-            } if result.success else {
-                "error_message": result.error_message,
-                "error_type": result.error_type
-            },
-            "timestamp": datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        logger.error(f"代码生成失败：{e}")
-        raise
+    return jsonify({
+        "success": False,
+        "message": "代码生成模块当前未对外导出统一入口，后续会补齐。",
+        "timestamp": datetime.now().isoformat()
+    }), 501
 
 @app.route('/api/data/objects', methods=['GET'])
 @handle_errors

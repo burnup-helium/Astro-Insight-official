@@ -61,40 +61,26 @@
 
 ## 快速开始
 
-### 5分钟设置
+### 本仓库当前的推荐运行方式
 
-**步骤1：克隆仓库**
-```bash
-git clone https://github.com/xinzhuwang-wxz/Astro-Insight.git
-cd Astro-Insight
-```
+如果你想先把项目在本地跑起来并查看前端，建议直接阅读同目录下的运行指南：`RUNNING_GUIDE.md`。
 
-**步骤2：安装依赖**
+最短路径如下：
+
 ```bash
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+python server.py
 ```
 
-**步骤3：配置环境**
-```bash
-# 编辑conf.yaml添加您的API密钥
-cp conf.yaml conf_backup.yaml
+然后访问：
 
-# 如使用本地LLM安装并启动Ollama
-ollama serve
-ollama pull qwen2.5:7b
-```
+- `http://localhost:8000/health`
+- `http://localhost:8000/api/status`
+- `http://localhost:8000/`
 
-**步骤4：运行系统**
-
-```bash
-# 终端交互模式
-python main.py
-
-# 启动项目API服务, 测试前端
-python api_service/start_api.py
-open api_service/frontend_examples.html
-```
-
+> 注意：当前 `server.py` 的首页路由返回的是 API JSON，不是前端模板页面。若你要直接看前端工作台，需要把首页路由改成渲染 `templates/index.html`，或者临时从静态文件方式打开模板页。
 ## 系统架构
 
 ### 核心架构图
