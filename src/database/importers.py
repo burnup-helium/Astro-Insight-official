@@ -143,7 +143,18 @@ class CSVImporter:
                 """,
                 (feature_set_id, feature_name),
             )
-            row = cursor.fetchone()
-            if not row:
-                raise RuntimeError(f"Feature definition not found for {feature_name}")
-            return int(row[0])
+            result = cursor.fetchone()
+
+        if result:
+            return result[0]
+        
+        # 不存在则创建
+        cursor.execute(
+            "INSERT INTO feature_definitions (feature_set_id, field_name) VALUES (?, ?)",
+            (feature_set_id, feature_name)
+        )
+        conn.commit()
+        new_id = cursor.lastrowid
+        # 执行完立即关闭连接，解决锁死
+        cursor.close()
+        return new_id

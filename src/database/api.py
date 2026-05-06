@@ -392,6 +392,32 @@ class DatabaseAPI:
             (data.get("task_type_name", ""), data.get("description")),
         )
 
+    def ensure_analysis_task_types(self) -> int:
+        seed = [
+            ("overview", "概览任务"),
+            ("eda", "探索性数据分析"),
+            ("structure", "结构分析"),
+            ("comparison", "方法对比"),
+            ("explanation", "结果解释"),
+        ]
+        inserted = 0
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            for name, desc in seed:
+                row = cursor.execute(
+                    "SELECT task_type_id FROM analysis_task_types WHERE task_type_name = ? LIMIT 1",
+                    (name,),
+                ).fetchone()
+                if row:
+                    continue
+                cursor.execute(
+                    "INSERT INTO analysis_task_types (task_type_name, description) VALUES (?, ?)",
+                    (name, desc),
+                )
+                inserted += 1
+            conn.commit()
+        return inserted
+
     def list_analysis_task_types(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         return self._query_all("analysis_task_types", limit=limit, offset=offset)
 
@@ -423,6 +449,32 @@ class DatabaseAPI:
             "INSERT INTO analysis_methods (method_name, method_family, description) VALUES (?, ?, ?)",
             (data.get("method_name", ""), data.get("method_family"), data.get("description")),
         )
+
+    def ensure_analysis_methods(self) -> int:
+        seed = [
+            ("PCA", "reduction", "主成分分析"),
+            ("t-SNE", "reduction", "t-SNE降维"),
+            ("UMAP", "reduction", "UMAP降维"),
+            ("correlation", "eda", "相关性分析"),
+            ("clustering", "structure", "聚类分析"),
+        ]
+        inserted = 0
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            for name, family, desc in seed:
+                row = cursor.execute(
+                    "SELECT method_id FROM analysis_methods WHERE method_name = ? LIMIT 1",
+                    (name,),
+                ).fetchone()
+                if row:
+                    continue
+                cursor.execute(
+                    "INSERT INTO analysis_methods (method_name, method_family, description) VALUES (?, ?, ?)",
+                    (name, family, desc),
+                )
+                inserted += 1
+            conn.commit()
+        return inserted
 
     def list_analysis_methods(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         return self._query_all("analysis_methods", limit=limit, offset=offset)
@@ -474,6 +526,34 @@ class DatabaseAPI:
             "INSERT INTO chart_types (chart_type_name, description) VALUES (?, ?)",
             (data.get("chart_type_name", ""), data.get("description")),
         )
+
+    def ensure_chart_types(self) -> int:
+        seed = [
+            ("histogram", "直方图"),
+            ("scatter", "散点图"),
+            ("heatmap", "热力图"),
+            ("boxplot", "箱线图"),
+            ("parallel_coordinates", "平行坐标"),
+            ("embedding", "嵌入图"),
+            ("comparison_matrix", "对比矩阵"),
+        ]
+        inserted = 0
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            for name, desc in seed:
+                row = cursor.execute(
+                    "SELECT chart_type_id FROM chart_types WHERE chart_type_name = ? LIMIT 1",
+                    (name,),
+                ).fetchone()
+                if row:
+                    continue
+                cursor.execute(
+                    "INSERT INTO chart_types (chart_type_name, description) VALUES (?, ?)",
+                    (name, desc),
+                )
+                inserted += 1
+            conn.commit()
+        return inserted
 
     def list_chart_types(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         return self._query_all("chart_types", limit=limit, offset=offset)

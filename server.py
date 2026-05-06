@@ -24,6 +24,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 try:
     from src.graph import build_graph_with_memory
     from src.database import data_manager, DatabaseAPI
+from src.database.importers import CSVImporter
 except ImportError as e:
     print(f"导入模块失败：{e}")
     print("请确保所有依赖模块已正确安装")
@@ -59,18 +60,25 @@ app.config.update(
 # 全局变量
 astro_graph = None
 db_api = None
+csv_importer = None
 
 # 初始化系统组件
 def initialize_system():
     """初始化系统组件"""
-    global astro_graph, db_api
+    global astro_graph, db_api, csv_importer
     
     try:
         logger.info("正在初始化天体分析系统...")
         
         # 初始化数据库API
         db_api = DatabaseAPI()
-        logger.info("数据库API初始化完成")
+        csv_importer = CSVImporter(db_api)
+        seed_counts = {
+            "task_types": db_api.ensure_analysis_task_types(),
+            "methods": db_api.ensure_analysis_methods(),
+            "chart_types": db_api.ensure_chart_types(),
+        }
+        logger.info(f"数据库API初始化完成，种子写入: {seed_counts}")
         
         # 初始化分析图
         astro_graph = build_graph_with_memory()
@@ -317,16 +325,142 @@ def get_statistics():
     """获取系统统计信息"""
     try:
         stats = db_api.get_statistics()
-        
+        mvp_stats = db_api.get_mvp_statistics()
+
         return jsonify({
             "success": True,
             "statistics": stats,
+            "mvp_statistics": mvp_stats,
             "timestamp": datetime.now().isoformat()
         })
-        
+
     except Exception as e:
         logger.error(f"获取统计信息失败：{e}")
         raise
+
+
+@app.route('/api/mvp/import-csv', methods=['POST'])
+@handle_errors
+def import_csv_dataset():
+    """导入CSV到MVP schema"""
+    data = request.get_json() or {}
+    csv_path = data.get('csv_path')
+    source_name = data.get('source_name')
+    source_type = data.get('source_type', 'catalog')
+    dataset_name = data.get('dataset_name')
+
+    if not csv_path or not source_name or not dataset_name:
+        raise BadRequest("缺少必要参数：csv_path, source_name, dataset_name")
+
+    result = csv_importer.import_dataset(
+        csv_path=csv_path,
+        source_name=source_name,
+        source_type=source_type,
+        dataset_name=dataset_name,
+        dataset_version=data.get('dataset_version'),
+        access_method=data.get('access_method', 'csv'),
+        base_url=data.get('base_url'),
+        description=data.get('description'),
+        object_family_field=data.get('object_family_field'),
+        object_name_field=data.get('object_name_field'),
+        feature_fields=data.get('feature_fields'),
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "CSV导入成功",
+        "result": result,
+        "timestamp": datetime.now().isoformat()
+    })
+
+
+@app.route('/api/mvp/overview', methods=['GET'])
+@handle_errors
+def get_mvp_overview():
+    """获取MVP新schema概览"""
+    limit = min(int(request.args.get('limit', 20)), 100)
+    return jsonify({
+        "success": True,
+        "data": {
+            "sources": db_api.list_data_sources(limit=limit),
+            "datasets": db_api.list_source_datasets(limit=limit),
+            "records": db_api.list_dataset_records(limit=limit),
+            "analysis_task_types": db_api.list_analysis_task_types(limit=limit),
+            "analysis_methods": db_api.list_analysis_methods(limit=limit),
+            "chart_types": db_api.list_chart_types(limit=limit),
+            "analysis_tasks": db_api.list_analysis_tasks(limit=limit),
+            "analysis_runs": db_api.list_analysis_runs(limit=limit),
+            "analysis_results": db_api.list_analysis_results(limit=limit),
+            "chart_configs": db_api.list_chart_configs(limit=limit),
+            "claims": db_api.list_interpretation_claims(limit=limit),
+        },
+        "timestamp": datetime.now().isoformat()
+    })
+
+
+@app.route('/api/mvp/bootstrap-demo', methods=['POST'])
+@handle_errors
+def bootstrap_demo_entities():
+    """创建一组最小演示任务/运行/图表/解释数据"""
+    task_types = db_api.list_analysis_task_types(limit=10)
+    methods = db_api.list_analysis_methods(limit=10)
+    chart_types = db_api.list_chart_types(limit=10)
+
+    if not task_types or not methods or not chart_types:
+        raise InternalServerError("缺少种子数据，请重启服务以初始化")
+
+    task_id = db_api.create_analysis_task({
+        "task_type_id": task_types[0]["task_type_id"],
+        "source_scope": {"source": "demo"},
+        "filters": {"sample": True},
+        "target_variables": ["feature_a", "feature_b"],
+        "task_name": "MVP Demo Task",
+        "task_status": "completed",
+    })
+
+    run_id = db_api.create_analysis_run({
+        "task_id": task_id,
+        "method_id": methods[0]["method_id"],
+        "parameters": {"n_components": 2},
+        "input_snapshot_hash": "demo_snapshot",
+        "runtime_ms": 123,
+        "run_status": "completed",
+    })
+
+    result_id = db_api.create_analysis_result({
+        "run_id": run_id,
+        "result_type": "embedding",
+        "result_payload": {"points": [[0.1, 0.2], [0.3, 0.4]]},
+        "summary_text": "Demo embedding generated.",
+    })
+
+    chart_config_id = db_api.create_chart_config({
+        "task_id": task_id,
+        "chart_type_id": chart_types[1]["chart_type_id"] if len(chart_types) > 1 else chart_types[0]["chart_type_id"],
+        "encoding_spec": {"x": "feature_a", "y": "feature_b"},
+        "color_theme": "default",
+        "axis_mapping": {"x": "feature_a", "y": "feature_b"},
+        "layout_spec": {"height": 320},
+    })
+
+    claim_id = db_api.create_interpretation_claim({
+        "task_id": task_id,
+        "claim_text": "样本数据在二维空间中存在可分离趋势。",
+        "confidence_level": 0.72,
+    })
+
+    return jsonify({
+        "success": True,
+        "message": "Demo entities created",
+        "result": {
+            "task_id": task_id,
+            "run_id": run_id,
+            "result_id": result_id,
+            "chart_config_id": chart_config_id,
+            "claim_id": claim_id,
+        },
+        "timestamp": datetime.now().isoformat(),
+    })
 
 # 健康检查
 @app.route('/health')

@@ -281,11 +281,17 @@ async function loadDataSummary() {
     try {
         const response = await axios.get(`${API_BASE}/api/data/statistics`);
         if (response.data.success) {
-            const stats = response.data.statistics || {};
-            document.getElementById('objectsCount').textContent = stats.total_objects || 0;
-            document.getElementById('classificationsCount').textContent = stats.total_classifications || 0;
-            document.getElementById('historyCount').textContent = stats.total_executions || 0;
-            document.getElementById('avgResponseTime').textContent = stats.avg_response_time ? `${stats.avg_response_time.toFixed(2)}s` : 'N/A';
+            const mvpStats = response.data.mvp_statistics || {};
+            const legacyStats = response.data.statistics || {};
+
+            const objects = mvpStats.dataset_records ?? legacyStats.total_objects ?? 0;
+            const classifications = mvpStats.analysis_results ?? legacyStats.total_classifications ?? 0;
+            const history = mvpStats.analysis_runs ?? legacyStats.total_executions ?? 0;
+
+            document.getElementById('objectsCount').textContent = objects;
+            document.getElementById('classificationsCount').textContent = classifications;
+            document.getElementById('historyCount').textContent = history;
+            document.getElementById('avgResponseTime').textContent = legacyStats.avg_response_time ? `${legacyStats.avg_response_time.toFixed(2)}s` : 'N/A';
             updateRecommendation();
         }
     } catch (error) {
@@ -299,63 +305,62 @@ async function loadDataSummary() {
 
 async function loadCelestialObjects() {
     try {
-        const response = await axios.get(`${API_BASE}/api/data/objects?limit=50`);
+        const response = await axios.get(`${API_BASE}/api/mvp/overview?limit=50`);
         if (response.data.success) {
             currentDataView = 'objects';
-            displayDataTable('天体对象', response.data.data || [], [
-                { key: 'name', label: '名称' },
-                { key: 'object_type', label: '类型' },
-                { key: 'coordinates', label: '坐标' },
-                { key: 'magnitude', label: '星等' },
-                { key: 'created_at', label: '创建时间' }
+            displayDataTable('MVP 数据记录', response.data.data?.records || [], [
+                { key: 'record_id', label: '记录ID' },
+                { key: 'dataset_id', label: '数据集ID' },
+                { key: 'object_name', label: '对象名称' },
+                { key: 'object_family', label: '对象类别' },
+                { key: 'ingested_at', label: '导入时间' }
             ]);
             showSection('data');
         }
     } catch (error) {
-        console.error('加载天体对象失败:', error);
-        showNotification('错误', '加载天体对象失败', 'error');
+        console.error('加载MVP数据记录失败:', error);
+        showNotification('错误', '加载MVP数据记录失败', 'error');
     }
 }
 
 async function loadClassifications() {
     try {
-        const response = await axios.get(`${API_BASE}/api/data/classifications?limit=50`);
+        const response = await axios.get(`${API_BASE}/api/mvp/overview?limit=50`);
         if (response.data.success) {
             currentDataView = 'classifications';
-            displayDataTable('分类结果', response.data.data || [], [
-                { key: 'object_name', label: '天体名称' },
-                { key: 'classification', label: '分类' },
-                { key: 'confidence', label: '置信度' },
-                { key: 'analysis_type', label: '分析类型' },
-                { key: 'user_type', label: '用户类型' },
+            displayDataTable('MVP 分析结果', response.data.data?.analysis_results || [], [
+                { key: 'result_id', label: '结果ID' },
+                { key: 'run_id', label: '运行ID' },
+                { key: 'result_type', label: '结果类型' },
+                { key: 'summary_text', label: '摘要' },
                 { key: 'created_at', label: '创建时间' }
             ]);
             showSection('data');
         }
     } catch (error) {
-        console.error('加载分类结果失败:', error);
-        showNotification('错误', '加载分类结果失败', 'error');
+        console.error('加载MVP分析结果失败:', error);
+        showNotification('错误', '加载MVP分析结果失败', 'error');
     }
 }
 
 async function loadExecutionHistory() {
     try {
-        const response = await axios.get(`${API_BASE}/api/data/history?limit=50`);
+        const response = await axios.get(`${API_BASE}/api/mvp/overview?limit=50`);
         if (response.data.success) {
             currentDataView = 'history';
-            displayDataTable('执行历史', response.data.data || [], [
-                { key: 'request_id', label: '请求ID' },
-                { key: 'code_type', label: '代码类型' },
-                { key: 'execution_status', label: '执行状态' },
-                { key: 'execution_time', label: '执行时间' },
-                { key: 'memory_usage', label: '内存使用' },
+            displayDataTable('MVP 分析运行', response.data.data?.analysis_runs || [], [
+                { key: 'run_id', label: '运行ID' },
+                { key: 'task_id', label: '任务ID' },
+                { key: 'method_id', label: '方法ID' },
+                { key: 'run_status', label: '运行状态' },
+                { key: 'runtime_ms', label: '运行耗时(ms)' },
                 { key: 'created_at', label: '创建时间' }
             ]);
             showSection('data');
         }
     } catch (error) {
-        console.error('加载执行历史失败:', error);
-        showNotification('错误', '加载执行历史失败', 'error');
+        console.error('加载MVP分析运行失败:', error);
+        showNotification('错误', '加载MVP分析运行失败', 'error');
     }
 }
 
