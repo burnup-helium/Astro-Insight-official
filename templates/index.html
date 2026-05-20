@@ -119,6 +119,7 @@
 
                     <div class="hidden lg:flex items-center gap-2">
                         <button data-nav="overview" class="nav-chip active px-3 py-2 rounded-full text-sm font-medium">首页</button>
+                        <button data-nav="ancient" class="nav-chip px-3 py-2 rounded-full text-sm font-medium">古代可视化</button>
                         <button data-nav="data" class="nav-chip px-3 py-2 rounded-full text-sm font-medium">数据概览</button>
                         <button data-nav="analysis" class="nav-chip px-3 py-2 rounded-full text-sm font-medium">EDA分析</button>
                         <button data-nav="structure" class="nav-chip px-3 py-2 rounded-full text-sm font-medium">结构空间</button>
@@ -263,6 +264,7 @@
                         </div>
                         <div class="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-1">
                             <button data-nav="overview" class="nav-chip active rounded-2xl px-4 py-3 text-left">首页总览</button>
+                            <button data-nav="ancient" class="nav-chip rounded-2xl px-4 py-3 text-left">古代可视化</button>
                             <button data-nav="data" class="nav-chip rounded-2xl px-4 py-3 text-left">数据概览</button>
                             <button data-nav="analysis" class="nav-chip rounded-2xl px-4 py-3 text-left">EDA分析</button>
                             <button data-nav="structure" class="nav-chip rounded-2xl px-4 py-3 text-left">结构空间</button>
@@ -313,6 +315,50 @@
                                 <div class="rounded-3xl p-4" style="background: rgba(15,118,110,0.10);">
                                     <div class="text-sm font-medium">解释任务</div>
                                     <p class="mt-2 text-sm" style="color: var(--muted);">看变量贡献、相关性、异常点，解释图为何如此呈现。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="ancientSection" class="section-view hidden" data-section="ancient">
+                        <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                            <div class="xl:col-span-8 glass-strong rounded-3xl p-5 sm:p-6 chart-shell">
+                                <div class="flex items-center justify-between flex-wrap gap-2">
+                                    <div>
+                                        <h3 class="text-xl font-semibold">古代可视化 · 星图连线与时空关联</h3>
+                                        <p class="mt-1 text-sm" style="color: var(--muted);">对应文档中的“一、古代可视化”：星图连线、亮度分层、光变曲线。</p>
+                                    </div>
+                                    <span class="mini-badge rounded-full px-3 py-1 text-xs" style="color: var(--muted);">SN 1054 · 古星表 · 现代对照</span>
+                                </div>
+                                <div class="mt-4 flex gap-2 flex-wrap">
+                                    <button data-ancient-view="star-map" class="ancient-chip primary-button rounded-2xl px-4 py-2 text-sm">星图连线</button>
+                                    <button data-ancient-view="magnitude" class="ancient-chip secondary-button rounded-2xl px-4 py-2 text-sm">亮度分层</button>
+                                    <button data-ancient-view="light-curve" class="ancient-chip secondary-button rounded-2xl px-4 py-2 text-sm">光变曲线</button>
+                                </div>
+                                <div id="ancientChartWrap" class="mt-4">
+                                    <canvas id="ancientChart" height="300"></canvas>
+                                </div>
+                            </div>
+                            <div class="xl:col-span-4 space-y-6">
+                                <div class="glass-strong rounded-3xl p-5">
+                                    <h4 class="font-semibold">数据说明</h4>
+                                    <div class="mt-3 space-y-2 text-sm" style="color: var(--muted);">
+                                        <p>• 古星表：`caafrc-中国古天文基础参考星表.csv`</p>
+                                        <p>• 星官连线：`clean_cols_CHN_constel.xlsx`</p>
+                                        <p>• SN 1054：`天关客星记录*.pdf` 与 `clean_cols_HSCv3.1Tautou.xlsx`</p>
+                                    </div>
+                                </div>
+                                <div class="glass-strong rounded-3xl p-5">
+                                    <h4 class="font-semibold">交互说明</h4>
+                                    <div class="mt-3 space-y-2 text-sm" style="color: var(--muted);">
+                                        <p>• 切换视图查看不同古代可视化方法。</p>
+                                        <p>• 星图强调空间关联，亮度图强调星等层次，光变图强调时间演化。</p>
+                                        <p>• 右侧结论说明帮助回答“结构是数据本身还是方法制造的”。</p>
+                                    </div>
+                                </div>
+                                <div class="glass-strong rounded-3xl p-5">
+                                    <h4 class="font-semibold">关键结论</h4>
+                                    <div id="ancientInsight" class="mt-3 text-sm space-y-2" style="color: var(--muted);"></div>
                                 </div>
                             </div>
                         </div>

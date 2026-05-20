@@ -5,6 +5,7 @@ let charts = {};
 let currentTheme = 'light';
 let currentChartPref = 'structure';
 let currentDataView = 'overview';
+let currentAncientView = 'star-map';
 
 const API_BASE = window.location.origin;
 
@@ -36,6 +37,13 @@ function bindUIEvents() {
     document.getElementById('loadClassificationsBtn')?.addEventListener('click', loadClassifications);
     document.getElementById('loadHistoryBtn')?.addEventListener('click', loadExecutionHistory);
     document.getElementById('refreshStatusBtn')?.addEventListener('click', checkSystemStatus);
+    document.querySelectorAll('[data-ancient-view]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentAncientView = btn.dataset.ancientView;
+            updateAncientViewUI();
+            renderAncientVisualization();
+        });
+    });
     document.getElementById('themeToggle')?.addEventListener('click', () => {
         applyTheme(currentTheme === 'light' ? 'dark' : 'light');
     });
@@ -122,6 +130,7 @@ function showSection(sectionName) {
     if (sectionName === 'data') loadDataSummary();
     if (sectionName === 'analysis') loadStatistics();
     if (sectionName === 'structure') loadStatistics();
+    if (sectionName === 'ancient') renderAncientVisualization();
     if (sectionName === 'compare') updateRecommendation();
     if (sectionName === 'results') updateInsightPanel();
 }
@@ -253,6 +262,121 @@ function updateInsightPanel(result = null) {
     panel.innerHTML = content.join('');
 }
 
+function updateAncientViewUI() {
+    document.querySelectorAll('[data-ancient-view]').forEach(btn => {
+        const active = btn.dataset.ancientView === currentAncientView;
+        btn.classList.toggle('primary-button', active);
+        btn.classList.toggle('secondary-button', !active);
+    });
+}
+
+function renderAncientVisualization() {
+    const insight = document.getElementById('ancientInsight');
+    if (insight) {
+        const mapInsights = {
+            'star-map': [
+                '星图连线重点展示古星表和星官结构的空间关系。',
+                '适合观察 SN 1054 与金牛座天区的空间对应。',
+                '连线本身会强化“属于同一星官”的认知。'
+            ],
+            'magnitude': [
+                '亮度分层强调星等的层次差异，而不是绝对位置。',
+                '适合对比古文献亮度描述与现代星等系统。',
+                '分层方式会影响“亮不亮”的感知结果。'
+            ],
+            'light-curve': [
+                '光变曲线把观察记录转成时间轴上的亮度演化。',
+                '适合比较 SN 1054 与现代变星/超新星模板。',
+                '时间尺度选择会改变爆发过程的理解。'
+            ]
+        };
+        insight.innerHTML = mapInsights[currentAncientView].map(item => `<p>• ${item}</p>`).join('');
+    }
+
+    const canvas = document.getElementById('ancientChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (charts.ancient) charts.ancient.destroy();
+
+    if (currentAncientView === 'star-map') {
+        charts.ancient = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    {
+                        label: '古星表',
+                        data: [
+                            {x: 0.8, y: 2.4}, {x: 1.6, y: 2.1}, {x: 2.1, y: 1.5}, {x: 3.0, y: 2.8}, {x: 3.6, y: 1.9}
+                        ],
+                        pointBackgroundColor: '#335cff',
+                        pointRadius: 5
+                    },
+                    {
+                        label: 'SN 1054 / 金牛座天区',
+                        data: [{x: 2.4, y: 2.0}],
+                        pointBackgroundColor: '#ef4444',
+                        pointRadius: 8
+                    }
+                ]
+            },
+            options: baseChartOptions({
+                scales: {
+                    x: { title: { display: true, text: 'RA (归一化)' }, ticks: { color: getTextColor() }, grid: { color: getGridColor() } },
+                    y: { title: { display: true, text: 'Dec (归一化)' }, ticks: { color: getTextColor() }, grid: { color: getGridColor() } }
+                },
+                plugins: { legend: { labels: { color: getTextColor() } } }
+            })
+        });
+        return;
+    }
+
+    if (currentAncientView === 'magnitude') {
+        charts.ancient = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['<6等', '6-10等', '>10等'],
+                datasets: [{
+                    label: '星体数量',
+                    data: [42, 18, 6],
+                    backgroundColor: ['#335cff', '#7c3aed', '#0f766e'],
+                    borderRadius: 12
+                }]
+            },
+            options: baseChartOptions({
+                scales: {
+                    x: { ticks: { color: getTextColor() }, grid: { color: getGridColor() } },
+                    y: { beginAtZero: true, ticks: { color: getTextColor() }, grid: { color: getGridColor() } }
+                },
+                plugins: { legend: { display: false } }
+            })
+        });
+        return;
+    }
+
+    charts.ancient = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['1054', '1055', '1056', '1057', '1058'],
+            datasets: [{
+                label: 'SN 1054 亮度示意',
+                data: [0.8, 0.65, 0.52, 0.42, 0.35],
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239,68,68,0.12)',
+                fill: true,
+                tension: 0.35,
+                pointRadius: 4
+            }]
+        },
+        options: baseChartOptions({
+            scales: {
+                x: { ticks: { color: getTextColor() }, grid: { color: getGridColor() } },
+                y: { beginAtZero: true, ticks: { color: getTextColor() }, grid: { color: getGridColor() } }
+            },
+            plugins: { legend: { labels: { color: getTextColor() } } }
+        })
+    });
+}
+
 async function checkSystemStatus() {
     try {
         const response = await axios.get(`${API_BASE}/api/status`);
@@ -293,6 +417,7 @@ async function loadDataSummary() {
             document.getElementById('historyCount').textContent = history;
             document.getElementById('avgResponseTime').textContent = legacyStats.avg_response_time ? `${legacyStats.avg_response_time.toFixed(2)}s` : 'N/A';
             updateRecommendation();
+            renderAncientVisualization();
         }
     } catch (error) {
         console.error('加载数据摘要失败:', error);
@@ -301,6 +426,7 @@ async function loadDataSummary() {
         document.getElementById('historyCount').textContent = '0';
         document.getElementById('avgResponseTime').textContent = 'N/A';
     }
+    renderAncientVisualization();
 }
 
 async function loadCelestialObjects() {
