@@ -71,5 +71,6 @@ results/
 .env.test.local
 .env.production.local
 
+*.zip
 
 
